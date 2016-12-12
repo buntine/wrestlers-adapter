@@ -40,9 +40,9 @@ mod tests {
 
     #[test]
     fn parse_mac_address() {
-        let le = LogEntry::new("test");
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 59-100-240-126.mel.static-ipl.aapt.com.au (\"U7LT,802aa843ac1d,v3.7.21.5389 libubnt[1441]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3")
 
-        assert_eq!(le.parse_mac_address().unwrap(), "abc123");
+        assert_eq!(le.parse_mac_address().unwrap(), "00:34:da:58:8d:a6");
     }
 
     #[test]
