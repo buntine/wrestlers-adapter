@@ -4,7 +4,9 @@ extern crate hyper;
 
 use regex::Regex;
 
-use std::net::{TcpListener, TcpStream};
+use std::io::prelude::*;
+
+use std::net::{TcpListener};
 
 use hyper::client::Client;
 use hyper::status::StatusCode;
@@ -45,13 +47,36 @@ impl<'a> LogEntry<'a> {
 }
 
 fn main() {
-    // Run TCP server as daemon on <PORT>
-    // Take in string
-    // Break into chunks
-    // Get MAC address
-    // POST request to https://wrestlers.hhd.com.au/<MAC>
-    //
-    // Also setup to run on bootup
+    const PORT: i32 = 10514;
+
+    let socket = format!("127.0.0.1:{}", PORT);
+    let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on port {}", PORT));
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(mut s) => {
+                let mut stream = String::new();
+
+                s.read_to_string(&mut stream).unwrap();
+
+                let le = LogEntry::new(&stream[..]);
+
+                let mac = match le.parse_mac_address() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        println!("Failed: {}", e);
+                        continue;
+                    },
+                };
+
+                match le.forward(&mac, "wrestlers.hhd.com.au") {
+                    Ok(_) => println!("Sent: {}", mac),
+                    Err(_) => println!("Failed: {}", mac),
+                }
+            },
+            Err(_) => continue,
+        }
+    }
 }
 
 #[cfg(test)]
