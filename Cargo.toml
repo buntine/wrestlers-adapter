@@ -6,3 +6,4 @@ authors = ["Bunts Thy Unholy <bunts@hhd.com.au>"]
 [dependencies]
 regex = "0.1"
 lazy_static = "0.1.*"
+hyper = "0.9"

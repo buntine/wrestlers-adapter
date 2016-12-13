@@ -1,7 +1,10 @@
 #[macro_use] extern crate lazy_static;
 extern crate regex;
+extern crate hyper;
 
 use regex::Regex;
+use hyper::client::Client;
+use hyper::status::StatusCode;
 
 #[derive(Debug, Copy, Clone)]
 pub struct LogEntry<'a> {
@@ -15,10 +18,10 @@ impl<'a> LogEntry<'a> {
 
     fn parse_mac_address(self) -> Result<&'a str, &'static str> {
         lazy_static! {
-            static ref mac: Regex = Regex::new(r"([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
+            static ref MAC: Regex = Regex::new(r"([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
         }
 
-        let mut cap = mac.captures_iter(&self.value);
+        let mut cap = MAC.captures_iter(&self.value);
         let first = match cap.nth(0) {
             Some(c) => c,
             None => return Err("No mac address present"),
@@ -27,8 +30,14 @@ impl<'a> LogEntry<'a> {
         first.at(0).ok_or("No mac address present")
     }
 
-    fn forward(self, mac_address: &'a str, host: &'a str) -> Result<i32, i32> {
-        Ok(200)
+    fn forward(self, mac_address: &'a str, host: &'a str) -> Result<StatusCode, StatusCode> {
+        let client = Client::new();
+        let url = format!("https://{}/{}", host, mac_address);
+
+        match client.post(&url[..]).send() {
+            Ok(r) => Ok(r.status),
+            Err(_) => Err(StatusCode::ServiceUnavailable),
+        }
     }
 }
 
@@ -45,6 +54,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hyper::status::StatusCode;
 
     #[test]
     fn new_log_entry() {
@@ -79,10 +89,14 @@ mod tests {
 
     #[test]
     fn forward() {
-        let le = LogEntry::new("test");
+        let le = LogEntry::new("[1441]: wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
         let mac = le.parse_mac_address();
 
         assert!(mac.is_ok());
-        assert_eq!(le.forward(mac.unwrap(), "wrestlers.hhd.com.au").unwrap(), 200);
+
+        let res = le.forward(mac.unwrap(), "wrestlers.hhd.com.au");
+
+        assert!(res.is_err());
+        assert_eq!(res, Err(StatusCode::ServiceUnavailable));
     }
 }
