@@ -42,7 +42,7 @@ impl<'a> LogEntry<'a> {
 
     fn forward(self, mac_address: &'a str, host: &'a str) -> Result<StatusCode, StatusCode> {
         let client = Client::new();
-        let url = format!("https://{}/{}", host, mac_address);
+        let url = format!("http://{}/{}", host, mac_address);
 
         match client.post(&url[..]).send() {
             Ok(r) => Ok(r.status),
@@ -52,14 +52,28 @@ impl<'a> LogEntry<'a> {
 }
 
 fn main() {
+    const HOST: &'static str = "127.0.0.1";
     const PORT: i32 = 10514;
+    const USER: &'static str = "andrew";
+    const GROUP: &'static str = "andrew";
 
-    let socket = format!("127.0.0.1:{}", PORT);
+    let socket = format!("{}:{}", HOST, PORT);
     let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on {}", socket));
 
     env_logger::init().expect("Cannot open log.");
 
     info!("Starting daemon");
+
+    let daemonize = Daemonize::new()
+        .pid_file("/tmp/wresters-adapter.pid")
+        .chown_pid_file(true)
+        .user(USER)
+        .group(GROUP);
+
+    match daemonize.start() {
+        Ok(_) => info!("Success, daemonized"),
+        Err(e) => error!("{}", e),
+    };
 
     for stream in listener.incoming() {
         match stream {
@@ -81,7 +95,7 @@ fn main() {
                     },
                 };
 
-                match le.forward(&mac, "wrestlers.hhd.com.au") {
+                match le.forward(&mac, "127.0.0.1") {
                     Ok(_) => info!("Sent: {}", mac),
                     Err(_) => warn!("Failed: {}", mac),
                 }
