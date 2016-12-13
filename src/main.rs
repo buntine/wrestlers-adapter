@@ -57,14 +57,16 @@ fn main() {
             Ok(mut s) => {
                 let mut stream = String::new();
 
-                s.read_to_string(&mut stream).unwrap();
+                if !s.read_to_string(&mut stream).is_ok() {
+                    continue;
+                }
 
                 let le = LogEntry::new(&stream[..]);
 
                 let mac = match le.parse_mac_address() {
                     Ok(m) => m,
                     Err(e) => {
-                        println!("Failed: {}", e);
+                        println!("Failed: {}, {}", e, stream);
                         continue;
                     },
                 };
@@ -101,15 +103,15 @@ mod tests {
 
     #[test]
     fn parse_mac_address1() {
-        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 59-100-240-126.mel.static-ipl.aapt.com.au (\"U7LT,802aa843ac1d,v3.7.21.5389 libubnt[1441]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:9d:a7 / 3");
 
         assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), "00:34:da:58:8d:a6");
+        assert_eq!(le.parse_mac_address().unwrap(), "00:34:da:58:9d:a7");
     }
 
     #[test]
     fn parse_mac_address2() {
-        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 59-100-240-126.mel.static-ipl.aapt.com.au (\"U7LT,802aa843ac1d,v3.7.21.5389 libubnt[1441]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: 0a:99:da:ab:19:c6 / 3");
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 0a:99:da:ab:19:c6 / 3");
 
         assert!(le.parse_mac_address().is_ok());
         assert_eq!(le.parse_mac_address().unwrap(), "0a:99:da:ab:19:c6");
@@ -138,7 +140,7 @@ mod tests {
 
     #[test]
     fn forward_ok() {
-        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 59-100-240-126.mel.static-ipl.aapt.com.au (\"U7LT,802aa843ac1d,v3.7.21.5389 libubnt[1441]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
         let mac = le.parse_mac_address();
 
         assert!(mac.is_ok());
