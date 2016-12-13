@@ -1,6 +1,9 @@
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+extern crate env_logger;
 extern crate regex;
 extern crate hyper;
+extern crate daemonize;
 
 use regex::Regex;
 
@@ -10,6 +13,8 @@ use std::net::{TcpListener};
 
 use hyper::client::Client;
 use hyper::status::StatusCode;
+
+use daemonize::Daemonize;
 
 #[derive(Debug, Copy, Clone)]
 pub struct LogEntry<'a> {
@@ -50,7 +55,11 @@ fn main() {
     const PORT: i32 = 10514;
 
     let socket = format!("127.0.0.1:{}", PORT);
-    let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on port {}", PORT));
+    let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on {}", socket));
+
+    env_logger::init().expect("Cannot open log.");
+
+    info!("Starting daemon");
 
     for stream in listener.incoming() {
         match stream {
@@ -58,6 +67,7 @@ fn main() {
                 let mut stream = String::new();
 
                 if !s.read_to_string(&mut stream).is_ok() {
+                    error!("Failed: Invalid stream");
                     continue;
                 }
 
@@ -66,14 +76,14 @@ fn main() {
                 let mac = match le.parse_mac_address() {
                     Ok(m) => m,
                     Err(e) => {
-                        println!("Failed: {}, {}", e, stream);
+                        error!("Failed: {}, {}", e, stream);
                         continue;
                     },
                 };
 
                 match le.forward(&mac, "wrestlers.hhd.com.au") {
-                    Ok(_) => println!("Sent: {}", mac),
-                    Err(_) => println!("Failed: {}", mac),
+                    Ok(_) => info!("Sent: {}", mac),
+                    Err(_) => warn!("Failed: {}", mac),
                 }
             },
             Err(_) => continue,
