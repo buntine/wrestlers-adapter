@@ -3,6 +3,9 @@ extern crate regex;
 extern crate hyper;
 
 use regex::Regex;
+
+use std::net::{TcpListener, TcpStream};
+
 use hyper::client::Client;
 use hyper::status::StatusCode;
 
@@ -64,6 +67,14 @@ mod tests {
     }
 
     #[test]
+    fn parse_mac_address_die() {
+        let le = LogEntry::new("this is invalid");
+
+        assert!(le.parse_mac_address().is_err());
+        assert_eq!(le.parse_mac_address(), Err("No mac address present"));
+    }
+
+    #[test]
     fn parse_mac_address1() {
         let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 59-100-240-126.mel.static-ipl.aapt.com.au (\"U7LT,802aa843ac1d,v3.7.21.5389 libubnt[1441]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
 
@@ -88,15 +99,28 @@ mod tests {
     }
 
     #[test]
-    fn forward() {
+    fn forward_die() {
         let le = LogEntry::new("[1441]: wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
+        let mac = le.parse_mac_address();
+
+        assert!(mac.is_ok());
+
+        let res = le.forward(mac.unwrap(), "doesnotexist.hhd.com.au");
+
+        assert!(res.is_err());
+        assert_eq!(res, Err(StatusCode::ServiceUnavailable));
+    }
+
+    #[test]
+    fn forward_ok() {
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 59-100-240-126.mel.static-ipl.aapt.com.au (\"U7LT,802aa843ac1d,v3.7.21.5389 libubnt[1441]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
         let mac = le.parse_mac_address();
 
         assert!(mac.is_ok());
 
         let res = le.forward(mac.unwrap(), "wrestlers.hhd.com.au");
 
-        assert!(res.is_err());
-        assert_eq!(res, Err(StatusCode::ServiceUnavailable));
+        assert!(res.is_ok());
+        assert_eq!(res, Err(StatusCode::Ok));
     }
 }
