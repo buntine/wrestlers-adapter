@@ -24,7 +24,7 @@ impl<'a> LogEntry<'a> {
             None => return Err("No mac address present"),
         };
 
-        Ok(first.at(0).unwrap())
+        first.at(0).ok_or("No mac address present")
     }
 
     fn forward(self, mac_address: &'a str, host: &'a str) -> Result<i32, i32> {
