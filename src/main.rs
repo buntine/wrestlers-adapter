@@ -22,6 +22,17 @@ pub enum Action<'a> {
     Leave(&'a str),
 }
 
+impl<'a> Action<'a> {
+    fn to_url(self, host: &'a str) -> String {
+        let (name, mac) = match self {
+            Action::Join(m) => ("join", m),
+            Action::Leave(m) => ("leave", m),
+        };
+
+        format!("http://{}/{}/{}", host, name, mac)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct LogEntry<'a> {
     value: &'a str,
@@ -32,7 +43,7 @@ impl<'a> LogEntry<'a> {
         LogEntry{value: v}
     }
 
-    fn parse_mac_address(self) -> Result<Action<'a>, &'static str> {
+    fn parse_action(self) -> Result<Action<'a>, &'static str> {
         lazy_static! {
             static ref MAC: Regex = Regex::new(r"([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
         }
@@ -40,21 +51,18 @@ impl<'a> LogEntry<'a> {
         let mut cap = MAC.captures_iter(&self.value);
         let first = match cap.nth(0) {
             Some(c) => c,
-            None => return Err("No mac address present"),
+            None => return Err("Invalid log entry format"),
         };
 
         match first.at(0) {
             Some(m) => Ok(Action::Join(m)),
-            None => Err("No mac address present"),
+            None => Err("Invalid log entry format"),
         }
     }
 
-    fn forward(self, mac_address: &Action, host: &'a str) -> Result<StatusCode, StatusCode> {
+    fn forward(self, action: &Action, host: &'a str) -> Result<StatusCode, StatusCode> {
         let client = Client::new();
-        let url = match mac_address {
-            &Action::Join(m) => format!("http://{}/join/{}", host, m),
-            &Action::Leave(m) => format!("http://{}/leave/{}", host, m),
-        };
+        let url = action.to_url(host);
 
         match client.post(&url[..]).send() {
             Ok(r) => Ok(r.status),
@@ -99,7 +107,7 @@ fn main() {
 
                 let le = LogEntry::new(&stream[..]);
 
-                let mac = match le.parse_mac_address() {
+                let action = match le.parse_action() {
                     Ok(a) => a,
                     Err(e) => {
                         error!("Failed: {}, {}", e, stream);
@@ -107,9 +115,9 @@ fn main() {
                     },
                 };
 
-                match le.forward(&mac, "127.0.0.1") {
-                    Ok(_) => info!("Sent: {:?}", mac),
-                    Err(_) => warn!("Failed: {:?}", mac),
+                match le.forward(&action, "127.0.0.1") {
+                    Ok(_) => info!("Sent: {:?}", action),
+                    Err(_) => warn!("Failed: {:?}", action),
                 }
             },
             Err(_) => continue,
@@ -130,45 +138,45 @@ mod tests {
     }
 
     #[test]
-    fn parse_mac_address_die() {
+    fn parse_action_die() {
         let le = LogEntry::new("this is invalid");
 
-        assert!(le.parse_mac_address().is_err());
-        assert_eq!(le.parse_mac_address(), Err("No mac address present"));
+        assert!(le.parse_action().is_err());
+        assert_eq!(le.parse_action(), Err("Invalid log entry format"));
     }
 
     #[test]
-    fn parse_mac_address1() {
+    fn parse_action1() {
         let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:9d:a7 / 3");
 
-        assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), Action::Join("00:34:da:58:9d:a7"));
+        assert!(le.parse_action().is_ok());
+        assert_eq!(le.parse_action().unwrap(), Action::Join("00:34:da:58:9d:a7"));
     }
 
     #[test]
-    fn parse_mac_address2() {
+    fn parse_action2() {
         let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 0a:99:da:ab:19:c6 / 3");
 
-        assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), Action::Join("0a:99:da:ab:19:c6"));
+        assert!(le.parse_action().is_ok());
+        assert_eq!(le.parse_action().unwrap(), Action::Join("0a:99:da:ab:19:c6"));
     }
  
     #[test]
-    fn parse_mac_address3() {
+    fn parse_action3() {
         let le = LogEntry::new("[1441]: wevent.ubnt(): EVENT_STA_LEAVE ath0: 5a:98:da:ab:19:c6 / 3");
 
-        assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), Action::Leave("5a:98:da:ab:19:c6"));
+        assert!(le.parse_action().is_ok());
+        assert_eq!(le.parse_action().unwrap(), Action::Leave("5a:98:da:ab:19:c6"));
     }
 
     #[test]
     fn forward_die() {
         let le = LogEntry::new("[1441]: wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
-        let mac = le.parse_mac_address();
+        let action = le.parse_action();
 
-        assert!(mac.is_ok());
+        assert!(action.is_ok());
 
-        let res = le.forward(&mac.unwrap(), "doesnotexist.hhd.com.au");
+        let res = le.forward(&action.unwrap(), "doesnotexist.hhd.com.au");
 
         assert!(res.is_err());
         assert_eq!(res, Err(StatusCode::ServiceUnavailable));
@@ -177,11 +185,11 @@ mod tests {
     #[test]
     fn forward_ok() {
         let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
-        let mac = le.parse_mac_address();
+        let action = le.parse_action();
 
-        assert!(mac.is_ok());
+        assert!(action.is_ok());
 
-        let res = le.forward(&mac.unwrap(), "wrestlers.hhd.com.au");
+        let res = le.forward(&action.unwrap(), "wrestlers.hhd.com.au");
 
         assert!(res.is_ok());
         assert_eq!(res, Err(StatusCode::Ok));
