@@ -8,8 +8,8 @@ extern crate daemonize;
 use regex::Regex;
 
 use std::io::prelude::*;
-
 use std::net::{TcpListener};
+use std::env;
 
 use hyper::client::Client;
 use hyper::status::StatusCode;
@@ -78,15 +78,15 @@ impl<'a> LogEntry<'a> {
 }
 
 fn main() {
-    const HOST: &'static str = "127.0.0.1";
-    const PORT: i32 = 10514;
-
-    let socket = format!("{}:{}", HOST, PORT);
+    let mut args = env::args().skip(1);
+    let host = args.next().unwrap_or("127.0.0.1".to_string());
+    let port = args.next().unwrap_or("10514".to_string());
+    let socket = format!("{}:{}", host, port);
     let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on {}", socket));
 
     env_logger::init().expect("Cannot open log.");
 
-    info!("Starting daemon");
+    info!("Starting daemon on {}", socket);
 
     let daemonize = Daemonize::new()
         .pid_file("/tmp/wresters-adapter.pid")
