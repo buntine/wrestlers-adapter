@@ -224,6 +224,4 @@ mod tests {
         let l = Action::from_str("LEAVE", "12:32:45:65:aa:ff").unwrap();
         assert_eq!(l.to_url("tester.com"), "http://tester.com/leave/12:32:45:65:aa:ff");
     }
-
-
 }
