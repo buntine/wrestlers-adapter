@@ -16,6 +16,12 @@ use hyper::status::StatusCode;
 
 use daemonize::Daemonize;
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Action<'a> {
+    Join(&'a str),
+    Leave(&'a str),
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct LogEntry<'a> {
     value: &'a str,
@@ -26,7 +32,7 @@ impl<'a> LogEntry<'a> {
         LogEntry{value: v}
     }
 
-    fn parse_mac_address(self) -> Result<&'a str, &'static str> {
+    fn parse_mac_address(self) -> Result<Action<'a>, &'static str> {
         lazy_static! {
             static ref MAC: Regex = Regex::new(r"([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
         }
@@ -37,12 +43,18 @@ impl<'a> LogEntry<'a> {
             None => return Err("No mac address present"),
         };
 
-        first.at(0).ok_or("No mac address present")
+        match first.at(0) {
+            Some(m) => Ok(Action::Join(m)),
+            None => Err("No mac address present"),
+        }
     }
 
-    fn forward(self, mac_address: &'a str, host: &'a str) -> Result<StatusCode, StatusCode> {
+    fn forward(self, mac_address: &Action, host: &'a str) -> Result<StatusCode, StatusCode> {
         let client = Client::new();
-        let url = format!("http://{}/{}", host, mac_address);
+        let url = match mac_address {
+            &Action::Join(m) => format!("http://{}/join/{}", host, m),
+            &Action::Leave(m) => format!("http://{}/leave/{}", host, m),
+        };
 
         match client.post(&url[..]).send() {
             Ok(r) => Ok(r.status),
@@ -88,7 +100,7 @@ fn main() {
                 let le = LogEntry::new(&stream[..]);
 
                 let mac = match le.parse_mac_address() {
-                    Ok(m) => m,
+                    Ok(a) => a,
                     Err(e) => {
                         error!("Failed: {}, {}", e, stream);
                         continue;
@@ -96,8 +108,8 @@ fn main() {
                 };
 
                 match le.forward(&mac, "127.0.0.1") {
-                    Ok(_) => info!("Sent: {}", mac),
-                    Err(_) => warn!("Failed: {}", mac),
+                    Ok(_) => info!("Sent: {:?}", mac),
+                    Err(_) => warn!("Failed: {:?}", mac),
                 }
             },
             Err(_) => continue,
@@ -130,7 +142,7 @@ mod tests {
         let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:9d:a7 / 3");
 
         assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), "00:34:da:58:9d:a7");
+        assert_eq!(le.parse_mac_address().unwrap(), Action::Join("00:34:da:58:9d:a7"));
     }
 
     #[test]
@@ -138,15 +150,15 @@ mod tests {
         let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 0a:99:da:ab:19:c6 / 3");
 
         assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), "0a:99:da:ab:19:c6");
+        assert_eq!(le.parse_mac_address().unwrap(), Action::Join("0a:99:da:ab:19:c6"));
     }
  
     #[test]
     fn parse_mac_address3() {
-        let le = LogEntry::new("[1441]: wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
+        let le = LogEntry::new("[1441]: wevent.ubnt(): EVENT_STA_LEAVE ath0: 5a:98:da:ab:19:c6 / 3");
 
         assert!(le.parse_mac_address().is_ok());
-        assert_eq!(le.parse_mac_address().unwrap(), "5a:98:da:ab:19:c6");
+        assert_eq!(le.parse_mac_address().unwrap(), Action::Leave("5a:98:da:ab:19:c6"));
     }
 
     #[test]
@@ -156,7 +168,7 @@ mod tests {
 
         assert!(mac.is_ok());
 
-        let res = le.forward(mac.unwrap(), "doesnotexist.hhd.com.au");
+        let res = le.forward(&mac.unwrap(), "doesnotexist.hhd.com.au");
 
         assert!(res.is_err());
         assert_eq!(res, Err(StatusCode::ServiceUnavailable));
@@ -169,7 +181,7 @@ mod tests {
 
         assert!(mac.is_ok());
 
-        let res = le.forward(mac.unwrap(), "wrestlers.hhd.com.au");
+        let res = le.forward(&mac.unwrap(), "wrestlers.hhd.com.au");
 
         assert!(res.is_ok());
         assert_eq!(res, Err(StatusCode::Ok));
