@@ -23,6 +23,14 @@ pub enum Action<'a> {
 }
 
 impl<'a> Action<'a> {
+    fn from_str(s: &'a str, mac: &'a str) -> Result<Action<'a>, &'static str> {
+        match s {
+            "JOIN" => Ok(Action::Join(mac)),
+            "LEAVE" => Ok(Action::Leave(mac)),
+            _ => Err("Invalid action")
+        }
+    }
+
     fn to_url(self, host: &'a str) -> String {
         let (name, mac) = match self {
             Action::Join(m) => ("join", m),
@@ -45,15 +53,15 @@ impl<'a> LogEntry<'a> {
 
     fn parse_action(self) -> Result<Action<'a>, &'static str> {
         lazy_static! {
-            static ref MAC: Regex = Regex::new(r"([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
+            static ref MAC: Regex = Regex::new(r"(?P<action>JOIN|LEAVE).+(?P<mac>[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
         }
 
         let mut cap = MAC.captures_iter(&self.value);
-        let first = cap.nth(0)
-                       .ok_or("Invalid log entry format")?;
+        let first = cap.nth(0).ok_or("Invalid log entry format")?;
+        let action = first.name("action").ok_or("Invalid log entry format")?;
 
-        match first.at(0) {
-            Some(m) => Ok(Action::Join(m)),
+        match first.name("mac") {
+            Some(m) => Action::from_str(&action, &m),
             None => Err("Invalid log entry format"),
         }
     }
@@ -169,7 +177,7 @@ mod tests {
 
     #[test]
     fn forward_die() {
-        let le = LogEntry::new("[1441]: wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
+        let le = LogEntry::new("[1441]: EVENT_JOIN wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
         let action = le.parse_action();
 
         assert!(action.is_ok());
@@ -192,4 +200,30 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(res, Err(StatusCode::Ok));
     }
+
+    #[test]
+    fn action_from_str_ok() {
+        let j = Action::from_str("JOIN", "123");
+        assert_eq!(j, Ok(Action::Join("123")));
+
+        let l = Action::from_str("LEAVE", "123");
+        assert_eq!(l, Ok(Action::Leave("123")));
+    }
+
+    #[test]
+    fn action_from_str_die() {
+        let j = Action::from_str("UNKNOWN", "123");
+        assert_eq!(j, Err("Invalid action"));
+    }
+
+    #[test]
+    fn action_to_url() {
+        let j = Action::from_str("JOIN", "123").unwrap();
+        assert_eq!(j.to_url("test.com"), "http://test.com/join/123");
+
+        let l = Action::from_str("LEAVE", "12:32:45:65:aa:ff").unwrap();
+        assert_eq!(l.to_url("tester.com"), "http://tester.com/leave/12:32:45:65:aa:ff");
+    }
+
+
 }
