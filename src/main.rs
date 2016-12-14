@@ -49,10 +49,8 @@ impl<'a> LogEntry<'a> {
         }
 
         let mut cap = MAC.captures_iter(&self.value);
-        let first = match cap.nth(0) {
-            Some(c) => c,
-            None => return Err("Invalid log entry format"),
-        };
+        let first = cap.nth(0)
+                       .ok_or("Invalid log entry format")?;
 
         match first.at(0) {
             Some(m) => Ok(Action::Join(m)),
@@ -115,7 +113,7 @@ fn main() {
                     },
                 };
 
-                match le.forward(&action, "127.0.0.1") {
+                match le.forward(&action, "127.0.0.1:8000") {
                     Ok(_) => info!("Sent: {:?}", action),
                     Err(_) => warn!("Failed: {:?}", action),
                 }
