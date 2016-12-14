@@ -80,8 +80,6 @@ impl<'a> LogEntry<'a> {
 fn main() {
     const HOST: &'static str = "127.0.0.1";
     const PORT: i32 = 10514;
-    const USER: &'static str = "andrew";
-    const GROUP: &'static str = "andrew";
 
     let socket = format!("{}:{}", HOST, PORT);
     let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on {}", socket));
@@ -92,9 +90,7 @@ fn main() {
 
     let daemonize = Daemonize::new()
         .pid_file("/tmp/wresters-adapter.pid")
-        .chown_pid_file(true)
-        .user(USER)
-        .group(GROUP);
+        .chown_pid_file(true);
 
     match daemonize.start() {
         Ok(_) => info!("Success, daemonized"),
