@@ -31,3 +31,12 @@ This allows us to trigger things like:
   - Slack bot to determine if someone is currently in the office
 
 Mapping of MAC address to Human is left to the API.
+
+## Usage
+
+The binary can be run as:
+```
+$ wrestlers-adapter [host] [port]
+```
+
+Host defaults to **127.0.0.1** and port defaults to **10514**.
