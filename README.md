@@ -1,12 +1,12 @@
 # Wrestling Theme Music TCP Adapter
 
-This programs purpose is to:
+This program will:
 
-  - Listen for rsyslog streams
+  - Listen for rsyslog streams on a given TCP port
   - Attempt to parse out a MAC address and action from the stream
-  - Build HTTP POST request to API, forwarding on details
+  - Build HTTP POST request to web service, forwarding on details
 
-It runs as a daemonized TCP server. So, you can think of it like a proxy that translates ugly syslog messages into HTTP API requests.
+It runs as a system daemon. So, you can think of it like a proxy that translates ugly syslog messages into web service requests.
 
 ## Process
 
@@ -17,8 +17,8 @@ https://some.api/<action>/<mac-address>
 
 For example:
 ```
-https://wrestlers.hhd.com.au/join/12:d4:ab:bd:64:f9
-https://wrestlers.hhd.com.au/leave/03:ff:cb:34:9a:00
+https://my-wifi.com.au/join/12:d4:ab:bd:64:f9
+https://my-wifi.com.au/leave/03:ff:cb:34:9a:00
 ```
 
 ## Why?
@@ -30,7 +30,7 @@ This allows us to trigger things like:
   - Standup ttendance / lateness logging
   - Slack bot to determine if someone is currently in the office
 
-Mapping of MAC address to Human is left to the API.
+Mapping of MAC address to Human is left to the web service.
 
 ## Usage
 
