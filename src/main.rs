@@ -8,8 +8,11 @@ extern crate daemonize;
 use regex::Regex;
 
 use std::io::prelude::*;
-use std::net::{TcpListener};
+use std::net::{TcpListener, TcpStream};
 use std::env;
+use std::time::Duration;
+
+use std::thread;
 
 use hyper::client::Client;
 use hyper::status::StatusCode;
@@ -77,6 +80,41 @@ impl<'a> LogEntry<'a> {
     }
 }
 
+fn handle_stream(mut s: TcpStream) {
+loop {
+        let mut read = [0; 1028];
+        match s.read(&mut read) {
+            Ok(n) => {
+                if n == 0 { 
+                    // connection was closed
+                    return;
+                }
+
+                let log_details = String::from_utf8_lossy(&read[0..n]);
+                let le = LogEntry::new(&log_details[..]);
+
+                let action = match le.parse_action() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        error!("Failed: {}", e);
+                        return;
+                    },
+                };
+
+                match le.forward(&action, "milkshakes.hhdclient.com.au") {
+                    Ok(_) => info!("Sent: {:?}", action),
+                    Err(_) => warn!("Failed: {:?}", action),
+                }
+            },
+            Err(err) => {
+                panic!(err);
+            }
+        }
+}
+
+
+}
+
 fn main() {
     let mut args = env::args().skip(1);
     let listen_port = args.next().unwrap_or("10514".to_string());
@@ -90,41 +128,26 @@ fn main() {
 
     env_logger::init().expect("Cannot open log.");
 
-    info!("Starting daemon on {}", listen_socket);
+    info!("Opened log");
 
-    let daemonize = Daemonize::new()
-        .pid_file("/tmp/wresters-adapter.pid")
-        .chown_pid_file(true);
+//    info!("Starting daemon on {}", listen_socket);
+//
+//   let daemonize = Daemonize::new()
+//       .pid_file("/tmp/wresters-adapter.pid")
+//       .chown_pid_file(true);
+//
+//   match daemonize.start() {
+//       Ok(_) => info!("Success, daemonized"),
+//       Err(e) => error!("{}", e),
+//   };
 
-    match daemonize.start() {
-        Ok(_) => info!("Success, daemonized"),
-        Err(e) => error!("{}", e),
-    };
-
-    for stream in listener.incoming() {
-        match stream {
+    for conn in listener.incoming() {
+        info!("Got it");
+        match conn {
             Ok(mut s) => {
-                let mut stream = String::new();
-
-                if !s.read_to_string(&mut stream).is_ok() {
-                    error!("Failed: Invalid stream");
-                    continue;
-                }
-
-                let le = LogEntry::new(&stream[..]);
-
-                let action = match le.parse_action() {
-                    Ok(a) => a,
-                    Err(e) => {
-                        error!("Failed: {}, {}", e, stream);
-                        continue;
-                    },
-                };
-
-                match le.forward(&action, &forward_socket) {
-                    Ok(_) => info!("Sent: {:?}", action),
-                    Err(_) => warn!("Failed: {:?}", action),
-                }
+                thread::spawn(move || {
+                    handle_stream(s);
+                });
             },
             Err(_) => continue,
         }
