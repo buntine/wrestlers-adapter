@@ -97,7 +97,7 @@ fn handle_stream(mut s: TcpStream, forward_socket: &str) -> Result<String, Strin
 
                 return match le.forward(&action, forward_socket) {
                     Ok(_) => Ok(format!("Sent: {:?}", action)),
-                    Err(_) => Err(format!("Failed")),
+                    Err(_) => Err(format!("Failed: {:?}", action)),
                 };
             },
             Err(e) => {
@@ -126,7 +126,6 @@ fn daemonize(socket: &str) {
         Ok(_) => (),
         Err(e) => error!("{}", e),
     }
-
 }
 
 fn main() {
@@ -137,7 +136,7 @@ fn main() {
 
     let listener = TcpListener::bind(&listen_socket[..]).expect(&format!("Cannot establish connection on {}", listen_socket));
 
-    env_logger::init().expect("Cannot open log.");
+    env_logger::init().expect("Cannot open log");
     info!("Opened log");
 
     daemonize(&listen_socket[..]);
