@@ -1,6 +1,6 @@
 [package]
 name = "wrestlers-adapter"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Bunts Thy Unholy <bunts@hhd.com.au>"]
 
 [dependencies]

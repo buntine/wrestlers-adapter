@@ -11,6 +11,7 @@ use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
 use std::env;
 
+use std::sync::Arc;
 use std::thread;
 
 use hyper::client::Client;
@@ -79,7 +80,7 @@ impl<'a> LogEntry<'a> {
     }
 }
 
-fn handle_stream(mut s: TcpStream) {
+fn handle_stream(mut s: TcpStream, forward_socket: &str) {
     loop {
         let mut read = [0; 1028];
 
@@ -101,7 +102,7 @@ fn handle_stream(mut s: TcpStream) {
                     },
                 };
 
-                match le.forward(&action, "milkshakes.hhdclient.com.au") {
+                match le.forward(&action, forward_socket) {
                     Ok(_) => info!("Sent: {:?}", action),
                     Err(_) => warn!("Failed: {:?}", action),
                 }
@@ -120,7 +121,7 @@ fn main() {
     let forward_port = args.next().unwrap_or("80".to_string());
 
     let listen_socket = format!("127.0.0.1:{}", listen_port);
-    let forward_socket = format!("{}:{}", host, forward_port);
+    let shared_forward_socket = Arc::new(format!("{}:{}", host, forward_port));
 
     let listener = TcpListener::bind(&listen_socket[..]).expect(&format!("Cannot establish connection on {}", listen_socket));
 
@@ -130,21 +131,21 @@ fn main() {
 
     info!("Starting daemon on {}", listen_socket);
 
-   let daemonize = Daemonize::new()
-       .pid_file("/tmp/wresters-adapter.pid")
-       .chown_pid_file(true);
+    let daemonize = Daemonize::new()
+        .pid_file("/tmp/wresters-adapter.pid")
+        .chown_pid_file(true);
 
-   match daemonize.start() {
-       Ok(_) => info!("Success, daemonized"),
-       Err(e) => error!("{}", e),
-   };
+    match daemonize.start() {
+        Ok(_) => (),
+        Err(e) => error!("{}", e),
+    }
 
     for conn in listener.incoming() {
-        info!("Got it");
         match conn {
             Ok(s) => {
+                let forward_socket = shared_forward_socket.clone();
                 thread::spawn(move || {
-                    handle_stream(s);
+                    handle_stream(s, &forward_socket[..]);
                 });
             },
             Err(_) => continue,
