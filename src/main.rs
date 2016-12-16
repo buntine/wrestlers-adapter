@@ -81,8 +81,9 @@ impl<'a> LogEntry<'a> {
 }
 
 fn handle_stream(mut s: TcpStream) {
-loop {
+    loop {
         let mut read = [0; 1028];
+
         match s.read(&mut read) {
             Ok(n) => {
                 if n == 0 { 
@@ -110,9 +111,7 @@ loop {
                 panic!(err);
             }
         }
-}
-
-
+    }
 }
 
 fn main() {
