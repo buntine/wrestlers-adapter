@@ -36,7 +36,5 @@ Mapping of MAC address to Human is left to the API.
 
 The binary can be run as:
 ```
-$ wrestlers-adapter [host] [port]
+$ wrestlers-adapter [listen_port=10514] [forward_host=127.0.0.1] [forward_port=80]
 ```
-
-Host defaults to **127.0.0.1** and port defaults to **10514**.

@@ -79,14 +79,18 @@ impl<'a> LogEntry<'a> {
 
 fn main() {
     let mut args = env::args().skip(1);
+    let listen_port = args.next().unwrap_or("10514".to_string());
     let host = args.next().unwrap_or("127.0.0.1".to_string());
-    let port = args.next().unwrap_or("10514".to_string());
-    let socket = format!("{}:{}", host, port);
-    let listener = TcpListener::bind(&socket[..]).expect(&format!("Cannot establish connection on {}", socket));
+    let forward_port = args.next().unwrap_or("80".to_string());
+
+    let listen_socket = format!("127.0.0.1:{}", listen_port);
+    let forward_socket = format!("{}:{}", host, forward_port);
+
+    let listener = TcpListener::bind(&listen_socket[..]).expect(&format!("Cannot establish connection on {}", listen_socket));
 
     env_logger::init().expect("Cannot open log.");
 
-    info!("Starting daemon on {}", socket);
+    info!("Starting daemon on {}", listen_socket);
 
     let daemonize = Daemonize::new()
         .pid_file("/tmp/wresters-adapter.pid")
@@ -117,7 +121,7 @@ fn main() {
                     },
                 };
 
-                match le.forward(&action, "127.0.0.1:8000") {
+                match le.forward(&action, &forward_socket) {
                     Ok(_) => info!("Sent: {:?}", action),
                     Err(_) => warn!("Failed: {:?}", action),
                 }
