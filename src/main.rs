@@ -80,56 +80,43 @@ impl<'a> LogEntry<'a> {
     }
 }
 
-fn handle_stream(mut s: TcpStream, forward_socket: &str) {
+fn handle_stream(mut s: TcpStream, forward_socket: &str) -> Result<String, String> {
     loop {
         let mut read = [0; 1028];
 
         match s.read(&mut read) {
             Ok(n) => {
                 if n == 0 { 
-                    // connection was closed
-                    return;
+                    return Err("Connection closed early".to_string());
                 }
 
                 let log_details = String::from_utf8_lossy(&read[0..n]);
                 let le = LogEntry::new(&log_details[..]);
 
-                let action = match le.parse_action() {
-                    Ok(a) => a,
-                    Err(e) => {
-                        error!("Failed: {}", e);
-                        return;
-                    },
-                };
+                let action = le.parse_action()?;
 
-                match le.forward(&action, forward_socket) {
-                    Ok(_) => info!("Sent: {:?}", action),
-                    Err(_) => warn!("Failed: {:?}", action),
-                }
+                return match le.forward(&action, forward_socket) {
+                    Ok(_) => Ok(format!("Sent: {:?}", action)),
+                    Err(_) => Err(format!("Failed")),
+                };
             },
-            Err(err) => {
-                panic!(err);
+            Err(e) => {
+                return Err(format!("Invalid stream: {:?}", e));
             }
         }
     }
 }
 
-fn main() {
+fn parse_opts() -> (String, String, String) {
     let mut args = env::args().skip(1);
-    let listen_port = args.next().unwrap_or("10514".to_string());
-    let host = args.next().unwrap_or("127.0.0.1".to_string());
-    let forward_port = args.next().unwrap_or("80".to_string());
 
-    let listen_socket = format!("127.0.0.1:{}", listen_port);
-    let shared_forward_socket = Arc::new(format!("{}:{}", host, forward_port));
+    (args.next().unwrap_or("10514".to_string()),
+     args.next().unwrap_or("127.0.0.1".to_string()),
+     args.next().unwrap_or("80".to_string()))
+}
 
-    let listener = TcpListener::bind(&listen_socket[..]).expect(&format!("Cannot establish connection on {}", listen_socket));
-
-    env_logger::init().expect("Cannot open log.");
-
-    info!("Opened log");
-
-    info!("Starting daemon on {}", listen_socket);
+fn daemonize(socket: &str) {
+    info!("Starting daemon on {}", socket);
 
     let daemonize = Daemonize::new()
         .pid_file("/tmp/wresters-adapter.pid")
@@ -140,12 +127,31 @@ fn main() {
         Err(e) => error!("{}", e),
     }
 
+}
+
+fn main() {
+    let (port, receive_host, receive_port) = parse_opts();
+
+    let listen_socket = format!("127.0.0.1:{}", port);
+    let shared_forward_socket = Arc::new(format!("{}:{}", receive_host, receive_port));
+
+    let listener = TcpListener::bind(&listen_socket[..]).expect(&format!("Cannot establish connection on {}", listen_socket));
+
+    env_logger::init().expect("Cannot open log.");
+    info!("Opened log");
+
+    daemonize(&listen_socket[..]);
+
     for conn in listener.incoming() {
         match conn {
             Ok(s) => {
                 let forward_socket = shared_forward_socket.clone();
+
                 thread::spawn(move || {
-                    handle_stream(s, &forward_socket[..]);
+                    match handle_stream(s, &forward_socket[..]) {
+                        Ok(s) => info!("{}", s),
+                        Err(s) => warn!("{}", s),
+                    }
                 });
             },
             Err(_) => continue,
