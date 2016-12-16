@@ -59,14 +59,13 @@ impl<'a> LogEntry<'a> {
             static ref MAC: Regex = Regex::new(r"(?P<action>JOIN|LEAVE).+(?P<mac>[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})").unwrap();
         }
 
+        let err = "Invalid log entry format";
         let mut cap = MAC.captures_iter(&self.value);
-        let first = cap.nth(0).ok_or("Invalid log entry format")?;
-        let action = first.name("action").ok_or("Invalid log entry format")?;
+        let first = cap.nth(0).ok_or(err)?;
+        let action = first.name("action").ok_or(err)?;
+        let mac = first.name("mac").ok_or(err)?;
 
-        match first.name("mac") {
-            Some(m) => Action::from_str(&action, &m),
-            None => Err("Invalid log entry format"),
-        }
+        Action::from_str(&action, &mac)
     }
 
     fn forward(self, action: &Action, host: &'a str) -> Result<StatusCode, StatusCode> {
