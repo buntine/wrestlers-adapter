@@ -10,7 +10,6 @@ use regex::Regex;
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
 use std::env;
-use std::time::Duration;
 
 use std::thread;
 
@@ -129,21 +128,21 @@ fn main() {
 
     info!("Opened log");
 
-//    info!("Starting daemon on {}", listen_socket);
-//
-//   let daemonize = Daemonize::new()
-//       .pid_file("/tmp/wresters-adapter.pid")
-//       .chown_pid_file(true);
-//
-//   match daemonize.start() {
-//       Ok(_) => info!("Success, daemonized"),
-//       Err(e) => error!("{}", e),
-//   };
+    info!("Starting daemon on {}", listen_socket);
+
+   let daemonize = Daemonize::new()
+       .pid_file("/tmp/wresters-adapter.pid")
+       .chown_pid_file(true);
+
+   match daemonize.start() {
+       Ok(_) => info!("Success, daemonized"),
+       Err(e) => error!("{}", e),
+   };
 
     for conn in listener.incoming() {
         info!("Got it");
         match conn {
-            Ok(mut s) => {
+            Ok(s) => {
                 thread::spawn(move || {
                     handle_stream(s);
                 });
