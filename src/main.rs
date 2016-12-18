@@ -80,28 +80,26 @@ impl<'a> LogEntry<'a> {
 }
 
 fn handle_stream(mut s: TcpStream, forward_socket: &str) -> Result<String, String> {
-    loop {
-        let mut read = [0; 1028];
+    let mut read = [0; 1028];
 
-        match s.read(&mut read) {
-            Ok(n) => {
-                if n == 0 { 
-                    return Err("Connection closed early".to_string());
-                }
-
-                let log_details = String::from_utf8_lossy(&read[0..n]);
-                let le = LogEntry::new(&log_details[..]);
-
-                let action = le.parse_action()?;
-
-                return match le.forward(&action, forward_socket) {
-                    Ok(_) => Ok(format!("Sent: {:?}", action)),
-                    Err(_) => Err(format!("Failed: {:?}", action)),
-                };
-            },
-            Err(e) => {
-                return Err(format!("Invalid stream: {:?}", e));
+    match s.read(&mut read) {
+        Ok(n) => {
+            if n == 0 { 
+                return Err("Connection closed early".to_string());
             }
+
+            let log_details = String::from_utf8_lossy(&read[0..n]);
+            let le = LogEntry::new(&log_details[..]);
+
+            let action = le.parse_action()?;
+
+            return match le.forward(&action, forward_socket) {
+                Ok(_) => Ok(format!("Sent: {:?}", action)),
+                Err(_) => Err(format!("Failed: {:?}", action)),
+            };
+        },
+        Err(e) => {
+            return Err(format!("Invalid stream: {:?}", e));
         }
     }
 }
@@ -115,14 +113,12 @@ fn parse_opts() -> (String, String, String) {
 }
 
 fn daemonize(socket: &str) {
-    info!("Starting daemon on {}", socket);
-
     let daemonize = Daemonize::new()
         .pid_file("/tmp/wresters-adapter.pid")
         .chown_pid_file(true);
 
     match daemonize.start() {
-        Ok(_) => (),
+        Ok(_) => info!("Starting daemon on {}", socket),
         Err(e) => error!("{}", e),
     }
 }
