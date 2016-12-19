@@ -143,7 +143,7 @@ fn main() {
     env_logger::init().expect("Cannot open log");
     info!("Opened log");
 
-    //daemonize(&listen_socket[..]);
+    daemonize(&listen_socket[..]);
 
     for conn in listener.incoming() {
         match conn {
