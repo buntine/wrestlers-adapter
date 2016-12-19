@@ -158,3 +158,98 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hyper::status::StatusCode;
+
+    #[test]
+    fn new_log_entry() {
+        let le = LogEntry::new("test");
+
+        assert_eq!(le.value, "test");
+    }
+
+    #[test]
+    fn parse_action_die() {
+        let le = LogEntry::new("this is invalid");
+
+        assert!(le.parse_action().is_err());
+        assert_eq!(le.parse_action(), Err("Invalid log entry format"));
+    }
+
+    #[test]
+    fn parse_action1() {
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:9d:a7 / 3");
+
+        assert!(le.parse_action().is_ok());
+        assert_eq!(le.parse_action().unwrap(), Action::Join("00:34:da:58:9d:a7"));
+    }
+
+    #[test]
+    fn parse_action2() {
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 0a:99:da:ab:19:c6 / 3");
+
+        assert!(le.parse_action().is_ok());
+        assert_eq!(le.parse_action().unwrap(), Action::Join("0a:99:da:ab:19:c6"));
+    }
+ 
+    #[test]
+    fn parse_action3() {
+        let le = LogEntry::new("[1441]: wevent.ubnt(): EVENT_STA_LEAVE ath0: 5a:98:da:ab:19:c6 / 3");
+
+        assert!(le.parse_action().is_ok());
+        assert_eq!(le.parse_action().unwrap(), Action::Leave("5a:98:da:ab:19:c6"));
+    }
+
+    #[test]
+    fn forward_die() {
+        let le = LogEntry::new("[1441]: EVENT_JOIN wevent.ubnt(): ath0: 5a:98:da:ab:19:c6 / 3");
+        let action = le.parse_action();
+
+        assert!(action.is_ok());
+
+        let res = le.forward(&action.unwrap(), "doesnotexist.hhd.com.au");
+
+        assert!(res.is_err());
+        assert_eq!(res, Err(StatusCode::ServiceUnavailable));
+    }
+
+    #[test]
+    fn forward_ok() {
+        let le = LogEntry::new("DATA 127.0.0.1: <14>Dec 12 15:15:20 10.our.host.com.au (\"YO,v3.7.21.5389 libubnt[1441]: wevent.cust(): EVENT_STA_JOIN ath0: 00:34:da:58:8d:a6 / 3");
+        let action = le.parse_action();
+
+        assert!(action.is_ok());
+
+        let res = le.forward(&action.unwrap(), "wrestlers.hhd.com.au");
+
+        assert!(res.is_ok());
+        assert_eq!(res, Err(StatusCode::Ok));
+    }
+
+    #[test]
+    fn action_from_str_ok() {
+        let j = Action::from_str("JOIN", "123");
+        assert_eq!(j, Ok(Action::Join("123")));
+
+        let l = Action::from_str("LEAVE", "123");
+        assert_eq!(l, Ok(Action::Leave("123")));
+    }
+
+    #[test]
+    fn action_from_str_die() {
+        let j = Action::from_str("UNKNOWN", "123");
+        assert_eq!(j, Err("Invalid action"));
+    }
+
+    #[test]
+    fn action_to_url() {
+        let j = Action::from_str("JOIN", "123").unwrap();
+        assert_eq!(j.to_url("test.com"), "http://test.com/join/123");
+
+        let l = Action::from_str("LEAVE", "12:32:45:65:aa:ff").unwrap();
+        assert_eq!(l.to_url("tester.com"), "http://tester.com/leave/12:32:45:65:aa:ff");
+    }
+}
