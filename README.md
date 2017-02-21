@@ -36,5 +36,5 @@ Mapping of MAC address to Human is left to the web service.
 
 The binary can be run as:
 ```
-$ wrestlers-adapter [listen_port=10514] [forward_host=127.0.0.1] [forward_port=80]
+$ wrestlers-adapter [listen_host=127.0.0.1] [listen_port=10514] [forward_host=127.0.0.1] [forward_port=80]
 ```

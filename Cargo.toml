@@ -1,7 +1,7 @@
 [package]
 name = "wrestlers-adapter"
-version = "0.3.5"
-authors = ["Bunts Thy Unholy <bunts@hhd.com.au>"]
+version = "0.3.6"
+authors = ["Andrew Buntine <info@bunts.io>"]
 
 [dependencies]
 regex = "0.1"

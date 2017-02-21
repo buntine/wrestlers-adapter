@@ -113,10 +113,11 @@ fn handle_stream(mut s: TcpStream, forward_socket: &str) {
     }
 }
 
-fn parse_opts() -> (String, String, String) {
+fn parse_opts() -> (String, String, String, String) {
     let mut args = env::args().skip(1);
 
-    (args.next().unwrap_or("10514".to_string()),
+    (args.next().unwrap_or("127.0.0.1".to_string()),
+     args.next().unwrap_or("10514".to_string()),
      args.next().unwrap_or("127.0.0.1".to_string()),
      args.next().unwrap_or("80".to_string()))
 }
@@ -133,10 +134,10 @@ fn daemonize(socket: &str) {
 }
 
 fn main() {
-    let (port, receive_host, receive_port) = parse_opts();
+    let (listen_host, listen_port, forward_host, forward_port) = parse_opts();
 
-    let listen_socket = format!("127.0.0.1:{}", port);
-    let shared_forward_socket = Arc::new(format!("{}:{}", receive_host, receive_port));
+    let listen_socket = format!("{}:{}", listen_host, listen_port);
+    let shared_forward_socket = Arc::new(format!("{}:{}", forward_host, forward_port));
 
     let listener = TcpListener::bind(&listen_socket[..]).expect(&format!("Cannot establish connection on {}", listen_socket));
 
