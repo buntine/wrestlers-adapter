@@ -27,7 +27,7 @@ This allows us to trigger things like:
 
   - Songs on the Sonos
   - Slack messages on entrance
-  - Standup ttendance / lateness logging
+  - Standup attendance / lateness logging
   - Slack bot to determine if someone is currently in the office
 
 Mapping of MAC address to Human is left to the web service.
