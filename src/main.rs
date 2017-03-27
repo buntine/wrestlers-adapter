@@ -30,7 +30,7 @@ impl<'a> Action<'a> {
         match s {
             "JOIN" => Ok(Action::Join(mac)),
             "LEAVE" => Ok(Action::Leave(mac)),
-            _ => Err("Invalid action")
+            _ => Err("Invalid action"),
         }
     }
 
@@ -68,6 +68,7 @@ impl<'a> LogEntry<'a> {
         Action::from_str(&action, &mac)
     }
 
+    // Triggers HTTP "POST" request to web service.
     fn forward(self, action: &Action, host: &'a str) -> Result<StatusCode, StatusCode> {
         let client = Client::new();
         let url = action.to_url(host);
@@ -146,6 +147,7 @@ fn main() {
 
     daemonize(&listen_socket[..]);
 
+    // Endlessly iterate over incoming TCP connections, spawning a new thread for each.
     for conn in listener.incoming() {
         match conn {
             Ok(s) => {
@@ -155,7 +157,10 @@ fn main() {
                     handle_stream(s, &forward_socket[..]);
                 });
             },
-            Err(_) => continue,
+            Err(_) => {
+                warn!("Could not initiate connection");
+                continue
+            },
         }
     }
 }
