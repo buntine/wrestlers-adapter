@@ -8,6 +8,8 @@ This program will:
 
 It runs as a system daemon. So, you can think of it like a proxy that translates ugly syslog messages into web service requests.
 
+This [blog post](https://dev.to/buntine/hulkamania-or-how-i-made-our-office-play-personalized-entrance-theme-music) provides an explanation and video demonstration.
+
 ## Process
 
 The configured web service will receive POST requests in the format:
